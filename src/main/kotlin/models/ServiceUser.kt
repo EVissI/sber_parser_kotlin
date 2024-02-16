@@ -2,21 +2,32 @@ package models
 
 class ServiceUser(
     var userFullName: UserFullName,
-    var serviceName: String,
-    var meterReadings: MeterReadings?,
+    var services: MutableList<Service>,
     var referenceRetrievalNumber: String,
     var plotNumber: String,
-    var payment: String
+    var payment:String
 ) {
 
     override fun toString(): String {
-        return "models.ServiceUser{" +
+        var result: String =
+                "models.ServiceUser{" +
                 "userFullName='" + userFullName + '\'' +
                 ", RRN ='" + referenceRetrievalNumber + '\'' +
-                ", serviceName='" + serviceName + '\'' +
-                ", meterReadings='" + meterReadings + '\'' +
-                ", payment='" + payment + '\'' +
-                ", plotNumber='" + plotNumber + '\'' +
-                '}'
+                ", plotNumber='" + plotNumber + '\''
+        for (service in services){
+            result += if (service.servicePayment != null&& service.meterReadings != null){
+                ", serviceName='" + service.serviceName + ": " + service.servicePayment + '\''+", meterReadings='" + service.meterReadings + '\''
+            }else if(service.servicePayment != null){
+                ", serviceName='" + service.serviceName + ": " + service.servicePayment + '\''
+            }else if(service.meterReadings != null){
+                ", serviceName='" + service.serviceName + '\''+", meterReadings='" + service.meterReadings + '\''
+            }
+            else{
+                ", serviceName='" + service.serviceName  + '\''
+            }
+        }
+        result += ", allPayment = '" + payment + '\''+
+            '}'
+        return result
     }
 }

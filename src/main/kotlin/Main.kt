@@ -1,14 +1,14 @@
 import com.sun.org.slf4j.internal.LoggerFactory
 import me.xdrop.fuzzywuzzy.FuzzySearch
 import models.MeterReadings
+import models.Service
 import models.ServiceUser
 import models.UserFullName
 import java.io.BufferedReader
 import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStreamReader
-import java.lang.Math.abs
-import java.lang.Math.max
+import kotlin.math.roundToInt
 
 class Main {
     companion object {
@@ -39,20 +39,39 @@ class Main {
 
                                 val serviceWords = serviceString.replace(Regex("(м3|квч|кв/ч)"), "")
                                     .replace(Regex("\\d+"), "").trim()
-                                val serviceName = takeServiceNameFromStr(serviceWords)
-
-                                var meterReadings: MeterReadings? = null
-                                if(hasUtilityMeter(serviceName)){
-                                    val serviceNumbers = Regex("\\d{2,}").findAll(serviceString).map { it.value }.toMutableList()
-                                    if (serviceNumbers.contains(plotNumber)){
-                                        serviceNumbers.remove(plotNumber)
-                                    }
-                                    if(serviceNumbers.isNotEmpty()){
-                                        meterReadings = takeUtlMeterReading(serviceName,serviceNumbers)
+                                val services = takeServiceNameFromStr(serviceWords)
+                                val serviceNumbers = Regex(pattern = "\\d{2,}").findAll(serviceString).map { it.value }.toMutableList()
+                                var servicePayments:MutableList<String>? = mutableListOf()
+                                if(serviceNumbers.isNotEmpty()){
+                                    servicePayments = findSubsetSum(serviceNumbers,payment.replace(',','.').toDouble())
+                                }
+                                if(servicePayments != null){
+                                    for(i in servicePayments){
+                                        serviceNumbers.remove(i)
                                     }
                                 }
 
-                                val user = ServiceUser(userFullName, serviceName, meterReadings ,referenceRetrievalNumber, plotNumber, payment)
+                                var meterReadings: MeterReadings? = null
+                                for(service in services){
+                                    if(servicePayments!=null){
+                                        service.servicePayment = servicePayments[0]
+                                        servicePayments.removeAt(0)
+                                    }
+
+
+                                    if(hasUtilityMeter(service.serviceName)){
+//                                        val serviceNumbers = Regex("\\d{2,}").findAll(serviceString).map { it.value }.toMutableList()
+//                                        if (serviceNumbers.contains(plotNumber)){
+//                                            serviceNumbers.remove(plotNumber)
+//                                        }
+//                                        if(serviceNumbers.isNotEmpty()){
+//                                            meterReadings = takeUtlMeterReading(serviceName,serviceNumbers)
+//                                        }
+                                    }
+                                }
+
+
+                                val user = ServiceUser(userFullName, services,referenceRetrievalNumber, plotNumber, payment)
                                 userData.add(user)
                             }
                         }
@@ -62,6 +81,44 @@ class Main {
                 log.error("File reading error: ", e)
             }
             return userData
+        }
+        private fun findSubsetSum(numbers: MutableList<String>, targetSum: Double): MutableList<String>? {
+            if (numbers.isEmpty()) {
+                return null
+            }
+
+            val dp = Array(numbers.size + 1) { IntArray((targetSum * 10).toInt() + 1) }
+            dp[0][0] = 1
+
+            for (i in 1..numbers.size) {
+                val num = (numbers[i - 1].toDouble() * 10).toInt()
+                for (j in 0..targetSum.toInt() * 10) {
+                    dp[i][j] = dp[i - 1][j]
+                    if (j >= num) {
+                        dp[i][j] = dp[i][j] or dp[i - 1][j - num]
+                    }
+                }
+            }
+
+            if (dp[numbers.size][(targetSum * 10).toInt()] != 1) {
+                return null
+            }
+
+            val subset = mutableListOf<String>()
+            var i = numbers.size
+            var j = (targetSum * 10).toInt()
+
+            while (i > 0 && j > 0) {
+                if (dp[i - 1][j] == 1) {
+                    i -= 1
+                } else {
+                    subset.add(numbers[i - 1])
+                    j -= (numbers[i - 1].toDouble() * 10).toInt()
+                    i -= 1
+                }
+            }
+
+            return subset
         }
 
         private fun takeUtlMeterReading(serviceName: String,numbers: MutableList<String>): MeterReadings? {
@@ -121,11 +178,11 @@ class Main {
             return UserFullName(firstName, secondName, fatherName)
         }
 
-        private fun takeServiceNameFromStr(serviceString: String): String {
+        private fun takeServiceNameFromStr(serviceString: String): MutableList<Service> {
             val words = serviceString.split(Regex("\\s+"))
             val referenceList = mapOf(
-                "Членский взнос" to "Членский взнос / чв / чл взнос",
-                "Целевой взнос" to "Целевой взнос / цв / цел взнос",
+                "Членский взнос" to "Членский  / чв / чл",
+                "Целевой взнос" to "Целевой / цв / цел",
                 "Охрана" to "Охрана",
                 "Вывоз мусора" to "Вывоз мусора",
                 "Водоотведение" to "Водоотведение",
@@ -139,16 +196,13 @@ class Main {
                 "Горячая вода" to "Горячая вода / гв / гор вода / гор вод",
                 "Газоснабжение" to "Газоснабжение / газ / гс ",
             )
-            var result = String()
-            var beautifulResult   = String()
-            var resultWeightRatio = 0;
+            val result : MutableList<Service> = mutableListOf()
 
             for (synonyms in referenceList.entries) {
                 for (word in words) {
-                    if (FuzzySearch.weightedRatio(word, synonyms.value) > resultWeightRatio){
-                        result = word
-                        beautifulResult = synonyms.key
-                        resultWeightRatio = FuzzySearch.weightedRatio(result, synonyms.value)
+                    if (FuzzySearch.weightedRatio(word, synonyms.value) > 85){
+                        result.add(Service(synonyms.key,null,null))
+                        break
                     }
                 }
             }
@@ -156,7 +210,7 @@ class Main {
             if (result.isEmpty()) {
                 log.warn("ServiceName is Empty, reference don't work at that line")
             }
-            return beautifulResult
+            return result
         }
     }
 }
