@@ -27,7 +27,7 @@ class ServiceUser(
             }
         }
         result += ", allPayment = '" + payment + '\''+
-            '}'
+            "}\n"
         return result
     }
 }

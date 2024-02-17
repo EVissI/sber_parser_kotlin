@@ -8,7 +8,6 @@ import java.io.BufferedReader
 import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStreamReader
-import kotlin.math.roundToInt
 
 class Main {
     companion object {
@@ -36,7 +35,6 @@ class Main {
                                 val plotNumber = values[5]
                                 val referenceRetrievalNumber = values[4]
 
-
                                 val serviceWords = serviceString.replace(Regex("(м3|квч|кв/ч)"), "")
                                     .replace(Regex("\\d+"), "").trim()
                                 val services = takeServiceNameFromStr(serviceWords)
@@ -50,23 +48,20 @@ class Main {
                                         serviceNumbers.remove(i)
                                     }
                                 }
+                                if (serviceNumbers.contains(plotNumber)){
+                                    serviceNumbers.remove(plotNumber)
+                                }
 
-                                var meterReadings: MeterReadings? = null
                                 for(service in services){
-                                    if(servicePayments!=null){
+                                    if(!servicePayments.isNullOrEmpty()){
                                         service.servicePayment = servicePayments[0]
                                         servicePayments.removeAt(0)
                                     }
 
-
                                     if(hasUtilityMeter(service.serviceName)){
-//                                        val serviceNumbers = Regex("\\d{2,}").findAll(serviceString).map { it.value }.toMutableList()
-//                                        if (serviceNumbers.contains(plotNumber)){
-//                                            serviceNumbers.remove(plotNumber)
-//                                        }
-//                                        if(serviceNumbers.isNotEmpty()){
-//                                            meterReadings = takeUtlMeterReading(serviceName,serviceNumbers)
-//                                        }
+                                        if(serviceNumbers.isNotEmpty()){
+                                            service.meterReadings = takeUtlMeterReading(service.serviceName,serviceNumbers)
+                                        }
                                     }
                                 }
 
@@ -82,6 +77,7 @@ class Main {
             }
             return userData
         }
+
         private fun findSubsetSum(numbers: MutableList<String>, targetSum: Double): MutableList<String>? {
             if (numbers.isEmpty()) {
                 return null
@@ -141,14 +137,14 @@ class Main {
                 2 -> {
                     val targetAverageValue = averageValueUtlMeter[serviceName]
                     val differance = kotlin.math.abs(meterReadingNumbers.max() - meterReadingNumbers.min())
-                    log.debug("разница для $serviceName:$differance")
+                    log.debug("$serviceName:$differance")
                     if (targetAverageValue != null) {
-                        if(differance >= targetAverageValue/2 && differance<=targetAverageValue*2){
+                        return if(differance >= targetAverageValue/2 && differance<=targetAverageValue*2){
                             result.pervValue =meterReadingNumbers.min().toString()
                             result.currentValue =meterReadingNumbers.max().toString()
-                            return result
+                            result
                         }else
-                            return null
+                            null
                     }
                 }
                 1 -> {
@@ -192,8 +188,8 @@ class Main {
                 "Содержание жилья" to "Содержание жилья / сод жилья",
                 "Пеня" to "Пеня",
                 "Электричество" to "Электричество / элво / эл-во / Электроэнергия / ээ",
-                "Холодная вода" to "Холодная вода / хв / хол вода / хол вод",
-                "Горячая вода" to "Горячая вода / гв / гор вода / гор вод",
+                "Холодная вода" to "Холодная / хв / хол / хол",
+                "Горячая вода" to "Горячая / гв / гор / гор",
                 "Газоснабжение" to "Газоснабжение / газ / гс ",
             )
             val result : MutableList<Service> = mutableListOf()
