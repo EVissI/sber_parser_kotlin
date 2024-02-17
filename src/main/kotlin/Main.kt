@@ -15,11 +15,11 @@ class Main {
 
         @JvmStatic
         fun main(args: Array<String>) {
-           println(sberTxtPaymentInfoParser())
+           println(sberTxtPaymentsInfoParser())
         }
 
 
-        private fun sberTxtPaymentInfoParser():List<ServiceUser>{
+        private fun sberTxtPaymentsInfoParser():List<ServiceUser>{
             val userData = mutableListOf<ServiceUser>()
             try {
                 FileInputStream("D:\\sber_parser\\sber_parser_kotlin\\src\\main\\resources\\testFiles\\5433117921_40703810602000000022_062.txt").use { fileInputStream ->
@@ -40,17 +40,10 @@ class Main {
                                 val services = takeServiceNameFromStr(serviceWords)
                                 val serviceNumbers = Regex(pattern = "\\d{2,}").findAll(serviceString).map { it.value }.toMutableList()
                                 var servicePayments:MutableList<String>? = mutableListOf()
-                                if(serviceNumbers.isNotEmpty()){
-                                    servicePayments = findSubsetSum(serviceNumbers,payment.replace(',','.').toDouble())
-                                }
-                                if(servicePayments != null){
-                                    for(i in servicePayments){
-                                        serviceNumbers.remove(i)
-                                    }
-                                }
-                                if (serviceNumbers.contains(plotNumber)){
-                                    serviceNumbers.remove(plotNumber)
-                                }
+                                serviceNumbers.removeIf { it == plotNumber }
+                                if(serviceNumbers.isNotEmpty()){ servicePayments = findSubsetSum(serviceNumbers,payment.replace(',','.').toDouble())}
+                                servicePayments?.let { serviceNumbers.removeAll(it) }
+
 
                                 for(service in services){
                                     if(!servicePayments.isNullOrEmpty()){
@@ -65,7 +58,6 @@ class Main {
                                     }
                                 }
 
-
                                 val user = ServiceUser(userFullName, services,referenceRetrievalNumber, plotNumber, payment)
                                 userData.add(user)
                             }
@@ -76,45 +68,6 @@ class Main {
                 log.error("File reading error: ", e)
             }
             return userData
-        }
-
-        private fun findSubsetSum(numbers: MutableList<String>, targetSum: Double): MutableList<String>? {
-            if (numbers.isEmpty()) {
-                return null
-            }
-
-            val dp = Array(numbers.size + 1) { IntArray((targetSum * 10).toInt() + 1) }
-            dp[0][0] = 1
-
-            for (i in 1..numbers.size) {
-                val num = (numbers[i - 1].toDouble() * 10).toInt()
-                for (j in 0..targetSum.toInt() * 10) {
-                    dp[i][j] = dp[i - 1][j]
-                    if (j >= num) {
-                        dp[i][j] = dp[i][j] or dp[i - 1][j - num]
-                    }
-                }
-            }
-
-            if (dp[numbers.size][(targetSum * 10).toInt()] != 1) {
-                return null
-            }
-
-            val subset = mutableListOf<String>()
-            var i = numbers.size
-            var j = (targetSum * 10).toInt()
-
-            while (i > 0 && j > 0) {
-                if (dp[i - 1][j] == 1) {
-                    i -= 1
-                } else {
-                    subset.add(numbers[i - 1])
-                    j -= (numbers[i - 1].toDouble() * 10).toInt()
-                    i -= 1
-                }
-            }
-
-            return subset
         }
 
         private fun takeUtlMeterReading(serviceName: String,numbers: MutableList<String>): MeterReadings? {
@@ -157,22 +110,6 @@ class Main {
             }
             return null
         }
-        private fun hasUtilityMeter(serviceName: String): Boolean {
-            val serviceNameWhoHaveUtlMeter = listOf("Электричество", "Холодная вода", "Горячая вода", "Газоснабжение")
-            for (phrase in serviceNameWhoHaveUtlMeter) {
-                if (phrase in serviceName) {
-                    return true
-                }
-            }
-            return false
-        }
-
-        private fun createUserFullNameWithOptionalFatherName(userFullNameStr: List<String>): UserFullName {
-            val firstName = userFullNameStr[1]
-            val secondName = userFullNameStr[0]
-            val fatherName = if (userFullNameStr.size > 2) userFullNameStr[2] else ""
-            return UserFullName(firstName, secondName, fatherName)
-        }
 
         private fun takeServiceNameFromStr(serviceString: String): MutableList<Service> {
             val words = serviceString.split(Regex("\\s+"))
@@ -208,5 +145,61 @@ class Main {
             }
             return result
         }
+
+        private fun findSubsetSum(numbers: MutableList<String>, targetSum: Double): MutableList<String>? {
+            if (numbers.isEmpty()) {
+                return null
+            }
+
+            val dp = Array(numbers.size + 1) { IntArray((targetSum * 10).toInt() + 1) }
+            dp[0][0] = 1
+
+            for (i in 1..numbers.size) {
+                val num = (numbers[i - 1].toDouble() * 10).toInt()
+                for (j in 0..targetSum.toInt() * 10) {
+                    dp[i][j] = dp[i - 1][j]
+                    if (j >= num) {
+                        dp[i][j] = dp[i][j] or dp[i - 1][j - num]
+                    }
+                }
+            }
+
+            if (dp[numbers.size][(targetSum * 10).toInt()] != 1) {
+                return null
+            }
+
+            val subset = mutableListOf<String>()
+            var i = numbers.size
+            var j = (targetSum * 10).toInt()
+
+            while (i > 0 && j > 0) {
+                if (dp[i - 1][j] == 1) {
+                    i -= 1
+                } else {
+                    subset.add(numbers[i - 1])
+                    j -= (numbers[i - 1].toDouble() * 10).toInt()
+                    i -= 1
+                }
+            }
+
+            return subset
+        }
+        private fun hasUtilityMeter(serviceName: String): Boolean {
+            val serviceNameWhoHaveUtlMeter = listOf("Электричество", "Холодная вода", "Горячая вода", "Газоснабжение")
+            for (phrase in serviceNameWhoHaveUtlMeter) {
+                if (phrase in serviceName) {
+                    return true
+                }
+            }
+            return false
+        }
+
+        private fun createUserFullNameWithOptionalFatherName(userFullNameStr: List<String>): UserFullName {
+            val firstName = userFullNameStr[1]
+            val secondName = userFullNameStr[0]
+            val fatherName = if (userFullNameStr.size > 2) userFullNameStr[2] else ""
+            return UserFullName(firstName, secondName, fatherName)
+        }
+
     }
 }
